@@ -1,13 +1,14 @@
-import math
-import sequtils
-import unittest2
+import std/math
+import std/sequtils
 
+import unittest2
 import chronos
-import chroprof/profiler
+
+import ../chroprof/profiler
 
 import ./utils
 
-suite "Profiler metrics test suite":
+suite "profiler metrics":
   
     setup:
       installCallbacks()

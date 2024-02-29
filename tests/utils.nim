@@ -1,5 +1,5 @@
 import chronos
-import pkg/chroprof/[api, events, profiler]
+import ../chroprof/[api, events, profiler]
 
 type
   SimpleEvent* = object

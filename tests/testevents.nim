@@ -3,10 +3,10 @@ import std/os
 import chronos
 import unittest2
 
-import pkg/chroprof/events
+import ../chroprof/events
 import ./utils
 
-suite "Profiler hooks test suite":
+suite "event ordering expectations":
 
   setup:
     installCallbacks()

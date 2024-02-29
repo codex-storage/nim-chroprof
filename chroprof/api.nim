@@ -1,7 +1,10 @@
 import chronos/futures
 import ./[profiler, events]
 
-type EventCallback = proc (e: Event) {.nimcall, gcsafe, raises: [].}
+export Event, ExtendedFutureState, ProfilerState, MetricsTotals,
+        AggregateMetrics, FutureType, execTimeWithChildren
+
+type EventCallback* = proc (e: Event) {.nimcall, gcsafe, raises: [].}
 
 var profilerInstance {.threadvar.}: ProfilerState
 
@@ -15,7 +18,8 @@ proc enableEventCallbacks*(callback: EventCallback): void =
   onAsyncFutureEvent = handleAsyncFutureEvent
   handleFutureEvent = callback
     
-proc enableProfiling*() =
+proc enableProfiling*(clientCallback: EventCallback = nil) =
   ## Enables profiling for the the event loop running in the current thread.
   handleFutureEvent = proc (e: Event) {.nimcall.} = 
     profilerInstance.processEvent(e)
+    if not isNil(clientCallback): clientCallback(e)
