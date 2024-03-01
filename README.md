@@ -1,7 +1,7 @@
 chroprof - Profiling for [Chronos](https://github.com/status-im/nim-chronos)
 ============================================================================
 
-This repo contains a usable profiler for [Chronos](https://github.com/status-im/nim-chronos). For the time being, it requires a modified version of Chronos ([V3](https://github.com/codex-storage/nim-chronos/tree/feature/profiler), [V4](https://github.com/codex-storage/nim-chronos/tree/feature/profiler-v4)) which has profiling hooks enabled.
+This repo contains a usable profiler for [Chronos](https://github.com/status-im/nim-chronos). For the time being, it requires [a modified version of Chronos V4](https://github.com/codex-storage/nim-chronos/tree/feature/profiler-v4) which has profiling hooks enabled.
 
 1. [Enabling profiling](#enabling-profiling)
 2. [Looking at metrics](#looking-at-metrics)
@@ -11,8 +11,11 @@ This repo contains a usable profiler for [Chronos](https://github.com/status-im/
 
 ## Enabling Profiling
 
-Profiling must be enabled per event loop thread. To enable it, you need to call,
-from the thread that will run your event loop:
+**Compile-time flag.** Profiling requires the `-d:chronosProfiling` compile-time
+flag. If you do not pass it, importing `chroprof` will fail.
+
+**Enabling the profiler.** The profiler must be enabled per event loop thread.
+To enable it, you need to call, from the thread that will run your event loop:
 
 ```nim
 import chroprof
@@ -23,7 +26,7 @@ enableProfiling()
 ## Looking at Metrics
 
 At any time during execution, you can get a snapshot of the profiler metrics 
-by calling `getMetrics()`. This will return a [`MetricsTotals`](https://github.com/codex-storage/nim-chroprof/blob/master/chroprof/profiler.nim#L56) object which
+by calling `getMetrics()`. This will return a [`MetricsTotals`](https://github.com/codex-storage/nim-chroprof/blob/master/chroprof/profiler.nim#L61) object which
 is a table mapping [`FutureType`](https://github.com/codex-storage/nim-chroprof/blob/master/chroprof/profiler.nim#L13)s to 
 [`AggregateMetrics`](https://github.com/codex-storage/nim-chroprof/blob/master/chroprof/profiler.nim#L17). You may then 
 print, log, or do whatever you like with those, including [export them to Prometheus](#enabling-profiling-with-prometheus-metrics).
