@@ -11,11 +11,10 @@ import ./utils
 suite "profiler metrics":
   
     setup:
-      installCallbacks()
+      startRecording()
 
     teardown:
-      clearRecording()
-      revertCallbacks()
+      stopRecording()
       resetTime()
 
     proc recordedMetrics(): MetricsTotals = 

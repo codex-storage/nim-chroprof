@@ -1,7 +1,7 @@
 ## This module contains the actual profiler implementation - the piece of code
-## responsible for computing and aggregating metrics from timestamped event 
-## sequences.
-## 
+## responsible for computing metrics from sequences of timestamped events and
+## aggregating them.
+
 import std/[tables, options, sets]
 import chronos/[timer, srcloc]
 
@@ -42,7 +42,7 @@ type
     callCount*: uint              ## Total number of distinct `Future`s observed
                                   ## for this `FutureType`.
 
-  PartialMetrics* = object
+  PartialMetrics = object
     state*: ExtendedFutureState
     created*: Moment
     lastStarted*: Moment
@@ -53,7 +53,7 @@ type
     parent*: Option[uint]
     pauses*: uint
 
-  MetricsTotals* = Table[SrcLoc, AggregateMetrics]
+  MetricsTotals* = Table[FutureType, AggregateMetrics]
 
   ProfilerState* = object
     callStack: seq[uint]
@@ -152,7 +152,7 @@ proc futureCompleted(self: var ProfilerState, event: Event): void =
 
   self.partials.del(event.futureId)
 
-proc processEvent*(self: var ProfilerState, event: Event): void =
+proc processEvent*(self: var ProfilerState, event: Event): void {.nimcall, gcsafe, raises: []} =
   case event.newState:
   of Pending: self.futureCreated(event)
   of Running: self.futureRunning(event)

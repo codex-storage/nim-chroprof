@@ -9,11 +9,10 @@ import ./utils
 suite "event ordering expectations":
 
   setup:
-    installCallbacks()
+    startRecording()
 
   teardown:
-    clearRecording()
-    revertCallbacks() 
+    stopRecording()
 
   test "should emit correct events for a simple future":
     

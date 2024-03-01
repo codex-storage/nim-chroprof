@@ -17,11 +17,14 @@ type
     Failed,
 
   Event* = object
+    ## A timestamped event transition in a `Future` state.
     future: FutureBase
     newState*: ExtendedFutureState
     timestamp*: Moment
+
+  EventCallback* = proc (e: Event) {.nimcall, gcsafe, raises: [].}
   
-var handleFutureEvent* {.threadvar.}: proc (event: Event) {.nimcall, gcsafe, raises: [].}
+var handleFutureEvent {.threadvar.}: EventCallback
 
 proc `location`*(self: Event): SrcLoc =
   self.future.internalLocation[Create][]
@@ -58,5 +61,16 @@ proc handleAsyncFutureEvent*(future: FutureBase,
     if not isNil(handleFutureEvent):
       handleFutureEvent(mkEvent(future, extendedState))
 
+proc enableMonitoring*(callback: EventCallback) =
+  ## Enables monitoring of Chronos `Future` state transitions on the
+  ## event loop that runs in the current thread. The provided callback will be
+  ## called at every such event.
+  onBaseFutureEvent = handleBaseFutureEvent
+  onAsyncFutureEvent = handleAsyncFutureEvent
+  handleFutureEvent = callback
 
+proc stopMonitoring*() =
+  onBaseFutureEvent = nil
+  onAsyncFutureEvent = nil
+  handleFutureEvent = nil
 

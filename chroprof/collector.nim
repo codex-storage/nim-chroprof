@@ -15,7 +15,7 @@ import ./api
 when defined(metrics):
   type
     ChronosProfilerInfo* = ref object of RootObj
-      perfSampler: PerfSampler
+      sampler: MetricsSampler
       sampleInterval: times.Duration
       clock: Clock
       k: int
@@ -23,7 +23,7 @@ when defined(metrics):
       lastSample: Time
       collections*: uint
 
-    PerfSampler = proc (): MetricsTotals {.raises: [].}
+    MetricsSampler = proc (): MetricsTotals {.raises: [].}
 
     Clock = proc (): Time {.raises: [].}
 
@@ -76,12 +76,12 @@ when defined(metrics):
 
   proc newCollector*(
     ChronosProfilerInfo: typedesc,
-    perfSampler: PerfSampler,
+    sampler: MetricsSampler,
     clock: Clock,
     sampleInterval: times.Duration,
     k: int = 10,
   ): ChronosProfilerInfo = ChronosProfilerInfo(
-    perfSampler: perfSampler,
+    sampler: sampler,
     clock: clock,
     k: k,
     sampleInterval: sampleInterval,
@@ -137,7 +137,7 @@ when defined(metrics):
 
     self.collections += 1
     var currentMetrics = self.
-      perfSampler().
+      sampler().
       pairs.
       toSeq.
       # We don't scoop metrics with 0 exec time as we have a limited number of
@@ -179,7 +179,7 @@ when defined(metrics):
       " the one that initialized the metricscolletor module."
 
     asyncProfilerInfo = ChronosProfilerInfo.newCollector(
-      perfSampler = proc (): MetricsTotals = getMetrics(),
+      sampler = getMetrics,
       k = k,
       # We want to collect metrics every 5 seconds.
       sampleInterval = initDuration(seconds = 5),
@@ -187,7 +187,7 @@ when defined(metrics):
     )
 
     enableProfiling(
-      proc (e: Event) {.nimcall, gcsafe.} =
+      proc (e: Event) {.nimcall, gcsafe, raises: [].} =
         {.cast(gcsafe).}:
           if e.newState == ExtendedFutureState.Completed:
             asyncProfilerInfo.collect()

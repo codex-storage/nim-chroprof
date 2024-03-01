@@ -30,19 +30,14 @@ proc recordSegment*(segment: string) =
       state: ExtendedFutureState.Running
     ))
 
-proc clearRecording*(): void =
+proc stopRecording*(): void =
   recording = @[]
   rawRecording = @[]
+  stopMonitoring()
 
-proc installCallbacks*() =
-  assert isNil(handleFutureEvent), "There is a callback already installed"
-
-  enableEventCallbacks(recordEvent)
-
-proc revertCallbacks*() =
-  assert not isNil(handleFutureEvent), "There are no callbacks installed"
-  
-  handleFutureEvent = nil
+proc startRecording*() =
+  stopRecording()
+  enableMonitoring(recordEvent)
 
 proc forProc*(self: var MetricsTotals, procedure: string): AggregateMetrics =
   for (key, aggMetrics) in self.mpairs:

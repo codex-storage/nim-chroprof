@@ -1,10 +1,7 @@
-import chronos/futures
 import ./[profiler, events]
 
 export Event, ExtendedFutureState, ProfilerState, MetricsTotals,
         AggregateMetrics, FutureType, execTimeWithChildren
-
-type EventCallback* = proc (e: Event) {.nimcall, gcsafe, raises: [].}
 
 var profilerInstance {.threadvar.}: ProfilerState
 
@@ -13,13 +10,16 @@ proc getMetrics*(): MetricsTotals =
   ## current thread.
   result = profilerInstance.metrics
 
-proc enableEventCallbacks*(callback: EventCallback): void =
-  onBaseFutureEvent = handleBaseFutureEvent
-  onAsyncFutureEvent = handleAsyncFutureEvent
-  handleFutureEvent = callback
-    
-proc enableProfiling*(clientCallback: EventCallback = nil) =
+proc enableProfiling*(callback: EventCallback = nil) =
   ## Enables profiling for the the event loop running in the current thread.
-  handleFutureEvent = proc (e: Event) {.nimcall.} = 
-    profilerInstance.processEvent(e)
-    if not isNil(clientCallback): clientCallback(e)
+  ## The client may optionally supply a callback to be notified of `Future`
+  ## events.
+  enableMonitoring(
+    if (isNil(callback)):
+      proc(e: Event) {.nimcall.} =
+        profilerInstance.processEvent(e)
+    else:
+      proc (e: Event) {.nimcall.} =
+        profilerInstance.processEvent(e)
+        callback(e)
+  )

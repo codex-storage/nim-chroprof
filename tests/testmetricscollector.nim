@@ -61,7 +61,7 @@ suite "metrics collector":
 
   proc setupCollector(k: int = high(int)): void =
     collector = ChronosProfilerInfo.newCollector(
-      perfSampler = proc (): MetricsTotals = sample,
+      sampler = proc (): MetricsTotals = sample,
       clock = proc (): Time = wallTime,
       sampleInterval = times.initDuration(minutes = 5),
       k = k,
