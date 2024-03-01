@@ -1,10 +1,9 @@
 import chronos
 import ../chroprof/[api, events, profiler]
 
-type
-  SimpleEvent* = object
-    procedure*: string
-    state*: ExtendedFutureState
+type SimpleEvent* = object
+  procedure*: string
+  state*: ExtendedFutureState
 
 # XXX this is sort of bad cause we get global state all over, but the fact we
 #   can't use closures on callbacks and that callbacks themselves are just
@@ -16,7 +15,8 @@ var fakeTime*: Moment = Moment.now()
 proc recordEvent(event: Event) {.nimcall, gcsafe, raises: [].} =
   {.cast(gcsafe).}:
     recording.add(
-      SimpleEvent(procedure: $event.location.procedure, state: event.newState))
+      SimpleEvent(procedure: $event.location.procedure, state: event.newState)
+    )
 
     var timeShifted = event
     timeShifted.timestamp = fakeTime
@@ -25,10 +25,7 @@ proc recordEvent(event: Event) {.nimcall, gcsafe, raises: [].} =
 
 proc recordSegment*(segment: string) =
   {.cast(gcsafe).}:
-    recording.add(SimpleEvent(
-      procedure: segment,
-      state: ExtendedFutureState.Running
-    ))
+    recording.add(SimpleEvent(procedure: segment, state: ExtendedFutureState.Running))
 
 proc stopRecording*(): void =
   recording = @[]
@@ -50,20 +47,20 @@ proc resetTime*() =
 proc advanceTime*(duration: Duration) =
   fakeTime += duration
 
-proc advanceTimeAsync*(duration: Duration): Future[void] = 
+proc advanceTimeAsync*(duration: Duration): Future[void] =
   # Simulates a non-blocking operation that takes the provided duration to 
   # complete.
   var retFuture = newFuture[void]("advanceTimeAsync")
   var timer: TimerCallback
 
   proc completion(data: pointer) {.gcsafe.} =
-    if not(retFuture.finished()):
+    if not (retFuture.finished()):
       advanceTime(duration)
       retFuture.complete()
 
   # The actual value for the timer is irrelevant, the important thing is that 
   # this causes the parent to pause before we advance time.
-  timer = setTimer(Moment.fromNow(10.milliseconds), 
-    completion, cast[pointer](retFuture))
+  timer =
+    setTimer(Moment.fromNow(10.milliseconds), completion, cast[pointer](retFuture))
 
   return retFuture

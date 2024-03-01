@@ -9,21 +9,20 @@ import chronos/[timer, futures, srcloc]
 
 type
   ExtendedFutureState* {.pure.} = enum
-    Pending,
-    Running,
-    Paused,
-    Completed,
-    Cancelled,
-    Failed,
+    Pending
+    Running
+    Paused
+    Completed
+    Cancelled
+    Failed
 
-  Event* = object
-    ## A timestamped event transition in a `Future` state.
+  Event* = object ## A timestamped event transition in a `Future` state.
     future: FutureBase
     newState*: ExtendedFutureState
     timestamp*: Moment
 
-  EventCallback* = proc (e: Event) {.nimcall, gcsafe, raises: [].}
-  
+  EventCallback* = proc(e: Event) {.nimcall, gcsafe, raises: [].}
+
 var handleFutureEvent {.threadvar.}: EventCallback
 
 proc `location`*(self: Event): SrcLoc =
@@ -33,16 +32,12 @@ proc `futureId`*(self: Event): uint =
   self.future.id
 
 proc mkEvent(future: FutureBase, state: ExtendedFutureState): Event =
-  Event(
-    future: future,
-    newState: state,
-    timestamp: Moment.now(),
-  )
-  
-proc handleBaseFutureEvent*(future: FutureBase,
-    state: FutureState): void {.nimcall.} =
+  Event(future: future, newState: state, timestamp: Moment.now())
+
+proc handleBaseFutureEvent*(future: FutureBase, state: FutureState): void {.nimcall.} =
   {.cast(gcsafe).}:
-    let extendedState = case state:
+    let extendedState =
+      case state
       of FutureState.Pending: ExtendedFutureState.Pending
       of FutureState.Completed: ExtendedFutureState.Completed
       of FutureState.Cancelled: ExtendedFutureState.Cancelled
@@ -51,10 +46,12 @@ proc handleBaseFutureEvent*(future: FutureBase,
     if not isNil(handleFutureEvent):
       handleFutureEvent(mkEvent(future, extendedState))
 
-proc handleAsyncFutureEvent*(future: FutureBase,
-    state: AsyncFutureState): void {.nimcall.} =
+proc handleAsyncFutureEvent*(
+    future: FutureBase, state: AsyncFutureState
+): void {.nimcall.} =
   {.cast(gcsafe).}:
-    let extendedState = case state:
+    let extendedState =
+      case state
       of AsyncFutureState.Running: ExtendedFutureState.Running
       of AsyncFutureState.Paused: ExtendedFutureState.Paused
 
@@ -73,4 +70,3 @@ proc stopMonitoring*() =
   onBaseFutureEvent = nil
   onAsyncFutureEvent = nil
   handleFutureEvent = nil
-
