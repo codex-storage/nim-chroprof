@@ -13,3 +13,5 @@ requires  "nim >= 1.6.16",
 
 task test, "Run tests":
   exec "nim c --out:./build/testall -r tests/testall.nim"
+  # nim-metrics doesn't play well with ARC
+  exec "nim c --out:./build/testall --mm:refc -d:metrics -r tests/testall.nim"

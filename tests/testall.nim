@@ -1,3 +1,6 @@
-import ./[testevents, testmetricscollector, testprofiler]
+import ./[testevents, testprofiler]
+
+when defined(metrics):
+  import ./testmetricscollector
 
 {.warning[UnusedImport]: off.}
