@@ -10,3 +10,7 @@ skipDirs    = @["tests"]
 requires  "nim >= 1.6.16",
           "https://github.com/codex-storage/nim-chronos#feature/profiler-v4",
           "metrics >= 0.1.0"
+
+
+task test, "Run tests":
+  exec "nim c --out:./build/testeall -r tests/testall.nim"
