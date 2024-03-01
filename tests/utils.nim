@@ -30,11 +30,11 @@ proc recordSegment*(segment: string) =
 proc stopRecording*(): void =
   recording = @[]
   rawRecording = @[]
-  stopMonitoring()
+  detachMonitoring()
 
 proc startRecording*() =
   stopRecording()
-  enableMonitoring(recordEvent)
+  attachMonitoring(recordEvent)
 
 proc forProc*(self: var MetricsTotals, procedure: string): AggregateMetrics =
   for (key, aggMetrics) in self.mpairs:

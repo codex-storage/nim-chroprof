@@ -15,7 +15,7 @@ proc enableProfiling*(callback: EventCallback = nil) =
   ## Enables profiling for the the event loop running in the current thread.
   ## The client may optionally supply a callback to be notified of `Future`
   ## events.
-  enableMonitoring(
+  attachMonitoring(
     if (isNil(callback)):
       proc(e: Event) {.nimcall.} =
         profilerInstance.processEvent(e)

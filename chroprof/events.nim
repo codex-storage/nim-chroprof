@@ -58,7 +58,7 @@ proc handleAsyncFutureEvent*(
     if not isNil(handleFutureEvent):
       handleFutureEvent(mkEvent(future, extendedState))
 
-proc enableMonitoring*(callback: EventCallback) =
+proc attachMonitoring*(callback: EventCallback) =
   ## Enables monitoring of Chronos `Future` state transitions on the
   ## event loop that runs in the current thread. The provided callback will be
   ## called at every such event.
@@ -66,7 +66,7 @@ proc enableMonitoring*(callback: EventCallback) =
   onAsyncFutureEvent = handleAsyncFutureEvent
   handleFutureEvent = callback
 
-proc stopMonitoring*() =
+proc detachMonitoring*() =
   onBaseFutureEvent = nil
   onAsyncFutureEvent = nil
   handleFutureEvent = nil
