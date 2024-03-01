@@ -12,4 +12,4 @@ requires  "nim >= 1.6.16",
           "metrics >= 0.1.0"
 
 task test, "Run tests":
-  exec "nim c --out:./build/testeall -r tests/testall.nim"
+  exec "nim c --out:./build/testall -r tests/testall.nim"
