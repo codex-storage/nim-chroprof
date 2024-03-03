@@ -1,7 +1,7 @@
 chroprof - Profiling for [Chronos](https://github.com/status-im/nim-chronos)
 ============================================================================
 
-This repo contains a usable profiler for [Chronos](https://github.com/status-im/nim-chronos). For the time being, it requires [a modified version of Chronos V4](https://github.com/codex-storage/nim-chronos/tree/feature/profiler-v4) which has profiling hooks enabled. Some of the rationale for the design and implementation of the profiler [can be found here](https://hackmd.io/eQ_ouNV4QZe0TG334_gkFg).
+This repo contains a usable profiler for [Chronos](https://github.com/status-im/nim-chronos). For the time being, it requires [a modified version of Chronos V4](https://github.com/codex-storage/nim-chronos/tree/feature/profiler-v4) which has profiling hooks enabled. Before attempting to use this, make sure you [understand the limitations](#limitations). Some of the rationale for the design and implementation of the profiler [can be found here](https://hackmd.io/eQ_ouNV4QZe0TG334_gkFg).
 
 1. [Enabling profiling](#enabling-profiling)
 2. [Looking at metrics](#looking-at-metrics)
@@ -57,7 +57,7 @@ which, in the context of a bug, may help identify the cause.
 
 ## Limitations
 
-* Nested `waitFor` calls are not supported;
+* Nested `waitFor` calls are not supported (as in, it'll crash your app);
 * Prometheus metrics only work with `refc` because nim-metrics only works with `refc`;
 * the Prometheus metrics collector can only be enabled for one event loop; i.e.,
   you cannot have multiple loops in different threads publishing metrics to Prometheus.
