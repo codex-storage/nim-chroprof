@@ -10,7 +10,7 @@ type SimpleEvent* = object
 #   global vars means we can't really do much better for now.
 var recording*: seq[SimpleEvent]
 var rawRecording*: seq[Event]
-var fakeTime*: Moment = Moment.now()
+var fakeTime*: Moment = Moment.init(0, 1.milliseconds)
 
 proc recordEvent(event: Event) {.nimcall, gcsafe, raises: [].} =
   {.cast(gcsafe).}:

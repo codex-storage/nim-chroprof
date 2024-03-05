@@ -274,3 +274,31 @@ suite "profiler metrics":
     ).sum
 
     check stillborns == 2
+
+  test "should properly account for children's execution time even when those finish after the parent":
+    let barrier = newFuture[void]("barrier")
+
+    proc child() {.async.} =
+      await barrier
+      advanceTime(10.milliseconds)
+
+    proc parent(): Future[Future[void]] {.async.} =
+      advanceTime(10.milliseconds)
+      return child()
+
+    let childFut = waitFor parent()
+    barrier.complete()
+    waitFor childFut
+
+    var metrics = recordedMetrics()
+    let parentMetrics = metrics.forProc("parent")
+    let childMetrics = metrics.forProc("child")
+
+    check parentMetrics.execTime == 10.milliseconds
+    check parentMetrics.childrenExecTime == 10.milliseconds
+    check parentMetrics.wallClockTime == 10.milliseconds
+
+    echo "EXE TIME ", $childMetrics.execTime
+    check childMetrics.execTime == 10.milliseconds
+    check childMetrics.wallClockTime == 10.milliseconds
+    check childMetrics.childrenExecTime == ZeroDuration
