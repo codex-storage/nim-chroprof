@@ -11,16 +11,18 @@ proc getMetrics*(): MetricsTotals =
   ## current thread.
   result = profilerInstance.metrics
 
-proc enableProfiling*(callback: EventCallback = nil) =
+template enableProfiling*(callback: EventCallback) =
   ## Enables profiling for the the event loop running in the current thread.
   ## The client may optionally supply a callback to be notified of `Future`
   ## events.
   attachMonitoring(
-    if (isNil(callback)):
-      proc(e: Event) {.nimcall.} =
-        profilerInstance.processEvent(e)
-    else:
-      proc(e: Event) {.nimcall.} =
+      proc(e: Event) {.nimcall, gcsafe, raises: [].} =
         profilerInstance.processEvent(e)
         callback(e)
+  )
+
+template enableProfiling*() =
+  attachMonitoring(
+    proc(e: Event) {.nimcall, gcsafe, raises: [].} =
+      profilerInstance.processEvent(e)
   )
