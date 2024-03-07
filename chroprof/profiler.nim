@@ -5,7 +5,9 @@
 import std/[tables, options, sets]
 import chronos/[timer, srcloc]
 
+import ./config
 import ./events
+import ./utils
 
 export timer, tables, sets, srcloc
 
@@ -48,15 +50,22 @@ type
       ## for this `FutureType`.
 
   PartialMetrics = object
-    state*: ExtendedFutureState
+    ## Tracks `PartialMetric`s for a single run of a given `Future`. `PartialMetrics` 
+    ## may not be complete until the `Future` and its children have reached a 
+    ## finish state.
     created*: Moment
     lastStarted*: Moment
     timeToFirstPause*: Duration
     partialExecTime*: Duration
     partialChildrenExecTime*: Duration
     partialChildrenExecOverlap*: Duration
-    parent*: Option[uint]
+    wallclockTime: Duration
     pauses*: uint
+
+    futureType: FutureType
+    state*: ExtendedFutureState
+    parent*: Option[uint]
+    liveChildren: uint
 
   MetricsTotals* = Table[FutureType, AggregateMetrics]
 
@@ -68,36 +77,32 @@ type
 proc `execTimeWithChildren`*(self: AggregateMetrics): Duration =
   self.execTime + self.childrenExecTime
 
-proc push(self: var seq[uint], value: uint): void =
-  self.add(value)
-
-proc pop(self: var seq[uint]): uint =
-  let value = self[^1]
-  self.setLen(self.len - 1)
-  value
-
-proc peek(self: var seq[uint]): Option[uint] =
-  if self.len == 0:
-    none(uint)
-  else:
-    self[^1].some
-
-proc `$`(location: SrcLoc): string =
-  $location.procedure & "[" & $location.file & ":" & $location.line & "]"
-
 proc futureCreated(self: var ProfilerState, event: Event): void =
   assert not self.partials.hasKey(event.futureId), $event.location
 
   self.partials[event.futureId] =
-    PartialMetrics(created: event.timestamp, state: Pending)
+    PartialMetrics(created: event.timestamp, state: Pending, futureType: event.location)
 
 proc bindParent(self: var ProfilerState, metrics: ptr PartialMetrics): void =
   let current = self.callStack.peek()
   if current.isNone:
+    when chroprofDebug:
+      echo "No parent for ", $metrics.futureType.procedure, ", ", $metrics.state
     return
 
   if metrics.parent.isSome:
     assert metrics.parent.get == current.get
+
+  self.partials.withValue(current.get, parentMetrics):
+    parentMetrics.liveChildren += 1
+    when chroprofDebug:
+      echo "SET_PARENT: Parent of ",
+        $metrics.futureType.procedure,
+        " is ",
+        $parentMetrics.futureType.procedure,
+        ", ",
+        $metrics.state
+
   metrics.parent = current
 
 proc futureRunning(self: var ProfilerState, event: Event): void =
@@ -128,40 +133,88 @@ proc futurePaused(self: var ProfilerState, event: Event): void =
     metrics.pauses += 1
     metrics.state = Paused
 
-proc futureCompleted(self: var ProfilerState, event: Event): void =
-  let location = event.location
-  if not self.metrics.hasKey(location):
-    self.metrics[location] = AggregateMetrics()
+proc aggregatePartial(
+    self: var ProfilerState, metrics: ptr PartialMetrics, futureId: uint
+): void =
+  ## Aggregates partial execution metrics into the total metrics for the given
+  ## `FutureType`.
 
-  self.metrics.withValue(location, aggMetrics):
-    if not self.partials.hasKey(event.futureId):
-      # Stillborn futures are those born in a finish state. We count those cause
-      # they may also be a byproduct of a bug.
-      aggMetrics.stillbornCount.inc()
+  self.metrics.withValue(metrics.futureType, aggMetrics):
+    let execTime = metrics.partialExecTime - metrics.partialChildrenExecOverlap
+
+    aggMetrics.callCount.inc()
+    aggMetrics.execTime += execTime
+    aggMetrics.execTimeMax = max(aggMetrics.execTimeMax, execTime)
+    aggMetrics.childrenExecTime += metrics.partialChildrenExecTime
+    aggMetrics.wallClockTime += metrics.wallclockTime
+
+    if metrics.parent.isSome:
+      self.partials.withValue(metrics.parent.get, parentMetrics):
+        when chroprofDebug:
+          echo $metrics.futureType.procedure,
+            ": add <<",
+            metrics.timeToFirstPause,
+            ">> overlap and <<",
+            metrics.partialExecTime,
+            ">> child exec time to parent (",
+            parentMetrics.futureType.procedure,
+            ")"
+
+        parentMetrics.partialChildrenExecTime += metrics.partialExecTime
+        parentMetrics.partialChildrenExecOverlap += metrics.timeToFirstPause
+        parentMetrics.liveChildren -= 1
+
+        if parentMetrics.state in FinishStates:
+          if parentMetrics.liveChildren == 0:
+            when chroprofDebug:
+              echo "Perfom deferred aggregation of completed parent with no live children: ",
+                $parentMetrics.futureType.procedure
+            self.aggregatePartial(parentMetrics, metrics.parent.get)
+          else:
+            when chroprofDebug:
+              echo "Parent ",
+                $parentMetrics.futureType.procedure,
+                " still has ",
+                parentMetrics.liveChildren,
+                " live children"
+
+  self.partials.del(futureId)
+
+proc countStillborn(self: var ProfilerState, futureType: FutureType): void =
+  self.metrics.withValue(futureType, aggMetrics):
+    aggMetrics.stillbornCount.inc()
+
+proc futureCompleted(self: var ProfilerState, event: Event): void =
+  let futureType = event.location
+  let futureId = event.futureId
+
+  if not self.metrics.hasKey(futureType):
+    self.metrics[futureType] = AggregateMetrics()
+
+  if not self.partials.hasKey(futureId):
+    self.countStillborn(futureType)
+    return
+
+  self.partials.withValue(futureId, partial):
+    if partial.state == Running:
+      self.futurePaused(event)
+      partial.state = event.newState
+
+    partial.wallclockTime = event.timestamp - partial.created
+
+    # Future still have live children, don't aggregate yet.
+    if partial.liveChildren > 0:
       return
 
-    self.partials.withValue(event.futureId, metrics):
-      if metrics.state == Running:
-        self.futurePaused(event)
-
-      let execTime = metrics.partialExecTime - metrics.partialChildrenExecOverlap
-
-      aggMetrics.callCount.inc()
-      aggMetrics.execTime += execTime
-      aggMetrics.execTimeMax = max(aggMetrics.execTimeMax, execTime)
-      aggMetrics.childrenExecTime += metrics.partialChildrenExecTime
-      aggMetrics.wallClockTime += event.timestamp - metrics.created
-
-      if metrics.parent.isSome:
-        self.partials.withValue(metrics.parent.get, parentMetrics):
-          parentMetrics.partialChildrenExecTime += metrics.partialExecTime
-          parentMetrics.partialChildrenExecOverlap += metrics.timeToFirstPause
-
-  self.partials.del(event.futureId)
+    self.aggregatePartial(partial, futureId)
 
 proc processEvent*(
     self: var ProfilerState, event: Event
 ): void {.nimcall, gcsafe, raises: [].} =
+  when chroprofDebug:
+    echo "EVENT:",
+      $event.location.procedure, ", ", event.newState, ", ", event.timestamp
+
   case event.newState
   of Pending:
     self.futureCreated(event)

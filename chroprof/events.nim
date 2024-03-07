@@ -23,6 +23,11 @@ type
 
   EventCallback* = proc(e: Event) {.nimcall, gcsafe, raises: [].}
 
+const FinishStates* = [
+  ExtendedFutureState.Completed, ExtendedFutureState.Cancelled,
+  ExtendedFutureState.Failed,
+]
+
 var handleFutureEvent {.threadvar.}: EventCallback
 
 proc `location`*(self: Event): SrcLoc =

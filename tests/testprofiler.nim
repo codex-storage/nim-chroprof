@@ -274,3 +274,63 @@ suite "profiler metrics":
     ).sum
 
     check stillborns == 2
+
+  test "should properly account for children's execution time even when those finish after the parent":
+    let barrier = newFuture[void]("barrier")
+
+    proc child() {.async.} =
+      await barrier
+      advanceTime(10.milliseconds)
+
+    proc parent(): Future[seq[Future[void]]] {.async.} =
+      advanceTime(10.milliseconds)
+      return @[child(), child()]
+
+    let childFut = waitFor parent()
+    barrier.complete()
+    waitFor allFutures(childFut)
+
+    var metrics = recordedMetrics()
+    let parentMetrics = metrics.forProc("parent")
+    let childMetrics = metrics.forProc("child")
+
+    check parentMetrics.execTime == 10.milliseconds
+    check parentMetrics.childrenExecTime == 20.milliseconds
+    check parentMetrics.wallClockTime == 10.milliseconds
+
+    check childMetrics.execTime == 20.milliseconds
+    check childMetrics.wallClockTime == 30.milliseconds
+    check childMetrics.childrenExecTime == ZeroDuration
+
+  test "should aggregate child execution times across nested children":
+    proc child() {.async.} =
+      advanceTime(10.milliseconds)
+
+    proc parent() {.async.} =
+      advanceTime(10.milliseconds)
+      await child()
+      advanceTime(10.milliseconds)
+
+    proc grandparent() {.async.} =
+      advanceTime(10.milliseconds)
+      await parent()
+      advanceTime(10.milliseconds)
+
+    waitFor grandparent()
+
+    var metrics = recordedMetrics()
+    let grandparentMetrics = metrics.forProc("grandparent")
+    let parentMetrics = metrics.forProc("parent")
+    let childMetrics = metrics.forProc("child")
+
+    check grandparentMetrics.execTime == 20.milliseconds
+    check grandparentMetrics.childrenExecTime == 30.milliseconds
+    check grandparentMetrics.wallClockTime == 50.milliseconds
+
+    check parentMetrics.execTime == 20.milliseconds
+    check parentMetrics.childrenExecTime == 10.milliseconds
+    check parentMetrics.wallClockTime == 30.milliseconds
+
+    check childMetrics.execTime == 10.milliseconds
+    check childMetrics.wallClockTime == 10.milliseconds
+    check childMetrics.childrenExecTime == ZeroDuration
